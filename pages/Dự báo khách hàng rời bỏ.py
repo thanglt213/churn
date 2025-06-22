@@ -134,7 +134,7 @@ fig = px.pie(
 st.plotly_chart(fig)
 
 # ===== Biểu đồ toàn bộ khách hàng theo xác suất rời bỏ =====
-st.subheader("📉 Danh sách khách hàng có nguy cơ rời bỏ (giảm dần)")
+st.subheader("📉 Danh sách khách hàng có nguy cơ rời bỏ")
 
 fig_all = px.bar(
     df_show,
