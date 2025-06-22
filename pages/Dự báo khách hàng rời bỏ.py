@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
 import plotly.express as px
 
 # ===== Cấu hình giao diện =====
@@ -9,28 +10,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-# st.sidebar.title("📂 Menu")
+st.sidebar.title("📂 Menu")
 
 st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng")
 
-# ===== Giải thích =====
+# ===== Giải thích dữ liệu =====
 with st.expander("📖 Giải thích các trường dữ liệu"):
     st.markdown("""
     | Trường | Mô tả |
     |--------|-------|
     | `age` | Tuổi |
     | `gender` | Giới tính (`Male`, `Female`) |
-    | `tenure` | Thời gian gắn bó |
+    | `tenure` | Số năm gắn bó |
     | `balance` | Số dư tài khoản |
-    | `num_txn_30d` | Giao dịch trong 30 ngày |
-    | `avg_txn_amt` | Giá trị trung bình giao dịch |
+    | `num_txn_30d` | Giao dịch 30 ngày gần nhất |
+    | `avg_txn_amt` | Số tiền trung bình mỗi giao dịch |
     | `has_credit_card` | Có thẻ tín dụng (1/0) |
     | `num_complaints` | Số lần khiếu nại |
     | `is_active` | (tự tính): 1 nếu có giao dịch |
     | `churned` | 1 = rời bỏ, 0 = giữ lại |
     """)
 
-# ===== Dữ liệu mẫu (gốc) =====
+# ===== Dữ liệu mẫu =====
 @st.cache_data
 def load_train_data():
     return pd.DataFrame({
@@ -77,7 +78,7 @@ else:
 st.subheader("📚 Dữ liệu huấn luyện (gốc)")
 st.dataframe(df_train_raw)
 
-# ===== Tiền xử lý bản sao cho mô hình =====
+# ===== Tiền xử lý bản sao =====
 df_train = df_train_raw.copy()
 if 'gender' in df_train.columns:
     df_train['gender'] = df_train['gender'].map({'Male': 0, 'Female': 1})
@@ -87,8 +88,13 @@ if 'num_txn_30d' in df_train.columns:
 # ===== Huấn luyện mô hình =====
 X = df_train.drop(columns=["customer_id", "churned"])
 y = df_train["churned"]
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
 model.fit(X, y)
+
+# ===== Đánh giá mô hình trên tập huấn luyện =====
+st.subheader("📋 Đánh giá mô hình trên dữ liệu huấn luyện")
+y_pred = model.predict(X)
+st.text(classification_report(y, y_pred, target_names=["Giữ lại", "Rời bỏ"]))
 
 # ===== Upload dữ liệu dự đoán =====
 st.subheader("📥 Tải dữ liệu CSV để dự đoán (tuỳ chọn)")
@@ -111,14 +117,18 @@ if 'gender' in df_predict.columns:
 if 'num_txn_30d' in df_predict.columns:
     df_predict['is_active'] = df_predict['num_txn_30d'].apply(lambda x: 1 if x > 0 else 0)
 
-# ===== Dự đoán =====
+# ===== Dự đoán & xác suất =====
 X_new = df_predict.drop(columns=["customer_id"])
 df_predict_raw["Churn Dự đoán"] = model.predict(X_new)
+probs = model.predict_proba(X_new)
+df_predict_raw["Xác suất rời bỏ (%)"] = (probs[:, 1] * 100).round(2)
 
+# ===== Hiển thị kết quả =====
 st.subheader("📊 Kết quả dự đoán")
-st.dataframe(df_predict_raw[["customer_id", "Churn Dự đoán"]])
+df_show = df_predict_raw[["customer_id", "Churn Dự đoán", "Xác suất rời bỏ (%)"]].sort_values(by="Xác suất rời bỏ (%)", ascending=False)
+st.dataframe(df_show)
 
-# ===== Biểu đồ tròn =====
+# ===== Biểu đồ tròn tổng thể =====
 pie_data = df_predict_raw["Churn Dự đoán"].value_counts().rename(index={0: "Giữ lại", 1: "Rời bỏ"}).reset_index()
 pie_data.columns = ["Trạng thái", "Số lượng"]
 
@@ -129,3 +139,16 @@ fig = px.pie(
     title="📈 Tỷ lệ khách hàng dự đoán rời bỏ"
 )
 st.plotly_chart(fig)
+
+# ===== Biểu đồ thanh Top 5 nguy cơ cao =====
+st.subheader("🔥 Top 5 khách hàng nguy cơ rời bỏ cao nhất")
+top5 = df_show.head(5)
+fig_bar = px.bar(
+    top5,
+    x="customer_id",
+    y="Xác suất rời bỏ (%)",
+    color="Xác suất rời bỏ (%)",
+    color_continuous_scale="Reds",
+    title="Top 5 khách hàng có xác suất rời bỏ cao nhất"
+)
+st.plotly_chart(fig_bar)
