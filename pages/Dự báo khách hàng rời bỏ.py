@@ -12,7 +12,7 @@ st.set_page_config(
 )
 st.sidebar.title("📂 Menu")
 
-st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng")
+st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng VRB")
 
 # ===== Giải thích dữ liệu =====
 with st.expander("📖 Giải thích các trường dữ liệu"):
