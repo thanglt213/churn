@@ -3,27 +3,34 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import plotly.express as px
 
-st.set_page_config(page_title="Dự đoán khách hàng rời bỏ ngân hàng", layout="wide")
-st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng qua hành vi giao dịch")
+# ===== Cấu hình trang =====
+st.set_page_config(
+    page_title="Dự đoán khách hàng rời bỏ",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+st.sidebar.title("📂 Menu")
 
-# ====== Giải thích ======
+st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng")
+
+# ===== Giải thích dữ liệu =====
 with st.expander("📖 Giải thích các trường dữ liệu"):
     st.markdown("""
     | Trường | Mô tả |
     |--------|-------|
     | `age` | Tuổi |
     | `gender` | Giới tính (`Male`, `Female`) |
-    | `tenure` | Thời gian gắn bó với ngân hàng |
+    | `tenure` | Số năm gắn bó |
     | `balance` | Số dư tài khoản |
-    | `num_txn_30d` | Số giao dịch trong 30 ngày gần nhất |
+    | `num_txn_30d` | Số giao dịch trong 30 ngày |
     | `avg_txn_amt` | Số tiền trung bình mỗi giao dịch |
-    | `has_credit_card` | Có thẻ tín dụng không (1/0) |
-    | `is_active` | **Được tính tự động**: nếu `num_txn_30d` > 0 thì là 1 |
+    | `has_credit_card` | Có thẻ tín dụng (1/0) |
     | `num_complaints` | Số lần khiếu nại |
-    | `churned` | (chỉ có ở dữ liệu huấn luyện) 1 = rời bỏ, 0 = giữ lại |
+    | `is_active` | Tự tính: 1 nếu có giao dịch |
+    | `churned` | Churn (1=rời bỏ, 0=giữ lại) |
     """)
 
-# ====== Dữ liệu huấn luyện ======
+# ===== Dữ liệu mặc định =====
 @st.cache_data
 def load_train_data():
     df = pd.DataFrame({
@@ -42,17 +49,6 @@ def load_train_data():
     df['is_active'] = df['num_txn_30d'].apply(lambda x: 1 if x > 0 else 0)
     return df
 
-df_train = load_train_data()
-X = df_train.drop(columns=["customer_id", "churned"])
-y = df_train["churned"]
-
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X, y)
-
-st.subheader("📚 Dữ liệu huấn luyện")
-st.dataframe(df_train)
-
-# ====== Dữ liệu cần dự đoán ======
 @st.cache_data
 def load_predict_data():
     df = pd.DataFrame({
@@ -70,22 +66,62 @@ def load_predict_data():
     df['is_active'] = df['num_txn_30d'].apply(lambda x: 1 if x > 0 else 0)
     return df
 
-df_predict = load_predict_data()
+# ===== Upload dữ liệu huấn luyện (tuỳ chọn) =====
+use_custom_train = st.checkbox("🛠️ Dùng dữ liệu huấn luyện từ file CSV")
+
+if use_custom_train:
+    train_file = st.file_uploader("Tải file CSV huấn luyện", type="csv", key="train_csv")
+    if train_file is not None:
+        df_train = pd.read_csv(train_file)
+        if 'gender' in df_train.columns:
+            df_train['gender'] = df_train['gender'].map({'Male': 0, 'Female': 1})
+        if 'num_txn_30d' in df_train.columns:
+            df_train['is_active'] = df_train['num_txn_30d'].apply(lambda x: 1 if x > 0 else 0)
+        st.success("✅ Đã tải dữ liệu huấn luyện.")
+    else:
+        st.warning("⚠️ Chưa có file, dùng dữ liệu mặc định.")
+        df_train = load_train_data()
+else:
+    df_train = load_train_data()
+
+st.subheader("📚 Dữ liệu huấn luyện")
+st.dataframe(df_train)
+
+# ===== Huấn luyện mô hình =====
+X = df_train.drop(columns=["customer_id", "churned"])
+y = df_train["churned"]
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X, y)
+
+# ===== Upload dữ liệu dự đoán =====
+st.subheader("📥 Tải dữ liệu CSV để dự đoán (tuỳ chọn)")
+uploaded_file = st.file_uploader("Chọn file CSV", type="csv", key="csv_upload")
+
+if uploaded_file is not None:
+    df_predict = pd.read_csv(uploaded_file)
+    if 'gender' in df_predict.columns:
+        df_predict['gender'] = df_predict['gender'].map({'Male': 0, 'Female': 1})
+    if 'num_txn_30d' in df_predict.columns:
+        df_predict['is_active'] = df_predict['num_txn_30d'].apply(lambda x: 1 if x > 0 else 0)
+    st.success("✅ Đã tải dữ liệu từ file.")
+else:
+    df_predict = load_predict_data()
+    st.info("🧪 Đang dùng dữ liệu mẫu.")
+
 st.subheader("📄 Dữ liệu cần dự đoán")
 st.dataframe(df_predict)
 
-# ====== Dự đoán ======
+# ===== Dự đoán =====
 X_new = df_predict.drop(columns=["customer_id"])
 df_predict["Churn Dự đoán"] = model.predict(X_new)
 
 st.subheader("📊 Kết quả dự đoán")
 st.dataframe(df_predict[["customer_id", "Churn Dự đoán"]])
 
-# Chuẩn bị dữ liệu biểu đồ tròn
+# ===== Biểu đồ tròn =====
 pie_data = df_predict["Churn Dự đoán"].value_counts().rename(index={0: "Giữ lại", 1: "Rời bỏ"}).reset_index()
 pie_data.columns = ["Trạng thái", "Số lượng"]
 
-# Vẽ biểu đồ
 fig = px.pie(
     pie_data,
     names="Trạng thái",
@@ -93,4 +129,3 @@ fig = px.pie(
     title="📈 Tỷ lệ khách hàng dự đoán rời bỏ"
 )
 st.plotly_chart(fig)
-
