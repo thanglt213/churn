@@ -8,7 +8,8 @@ st.markdown("""
 - Số giao dịch,
 - Số dư tài khoản,
 - Số lần khiếu nại,
-- Sự hoạt động gần đây...
+- Sự hoạt động gần đây,
+- Thời gian gắn bó...
 
 ### 🔍 Tính năng:
 - Dữ đoán khả năng rời bỏ của khách hàng
