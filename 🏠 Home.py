@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Giới thiệu", layout="centered")
+st.set_page_config(page_title="Dự đoán rời bỏ", layout="wide", initial_sidebar_state="expanded")
 
 st.title("👋 Chào mừng Anh Bùi Ngọc Tùng đến với ứng dụng Dự đoán khách bàng Rời bỏ Khách hàng")
 st.markdown("""
