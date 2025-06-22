@@ -9,7 +9,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.sidebar.title("📂 Menu")
 
 st.title("🔍 Dự đoán khách hàng rời bỏ ngân hàng")
 
